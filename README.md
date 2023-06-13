@@ -1,3 +1,4 @@
 ### jenkins
 
-    ssh kjell@kjbo01.tplinkdns.com
+`kjbo01.tplinkdns.com`
+1. Create PAT token in Github and save it to Jenkins
