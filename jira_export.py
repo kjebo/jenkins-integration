@@ -3,11 +3,6 @@ from jira import JIRA
 from datetime import datetime
 import requests
 
-def format_duration(duration):
-    hours, remainder = divmod(duration.total_seconds(), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
-
 options = {
     'server': 'http://localhost:8082/',
     'headers': {
@@ -20,7 +15,8 @@ options = {
 jira = JIRA(options=options)
 
 class Issue:
-    def __init__(self, key, issuetype, parent, subtasks, created, resolutiondate, changelog):
+    def __init__(self, id, key, issuetype, parent, subtasks, created, resolutiondate, changelog):
+        self.id = id
         self.key = key
         self.issuetype = issuetype
         self.parent = parent
@@ -30,7 +26,7 @@ class Issue:
         self.changelog = changelog
 
     def __str__(self):
-        return f"Key: {self.key}\nType: {self.issuetype}\nParent: {self.parent}\nSubtasks: {self.subtasks}\nCreated: {self.created}\nResolution Date: {self.resolutiondate}\nChangelog: {self.changelog}"
+        return f"ID: {self.id}\nKey: {self.key}\nType: {self.issuetype}\nParent: {self.parent}\nSubtasks: {self.subtasks}\nCreated: {self.created}\nResolution Date: {self.resolutiondate}\nChangelog: {self.changelog}"
 
 try:
     issues = jira.search_issues('')
@@ -38,6 +34,7 @@ try:
     issue_list = []
 
     for issue in issues:
+        issue_id = issue.id
         issue_key = issue.key
         issue_data = jira.issue(issue_key, expand='changelog')
 
@@ -54,25 +51,17 @@ try:
             subtasks = None
 
         changelog = []
-        previous_created = None
         for history in issue_data.changelog.histories:
             for item in history.items:
                 if item.fromString in ['In Review', 'To Do', 'In Progress', 'Done'] and item.toString in ['In Review', 'To Do', 'In Progress', 'Done']:
                     created_timestamp = history.created
-                    if previous_created:
-                        created_diff = datetime.strptime(created_timestamp, "%Y-%m-%dT%H:%M:%S.%f%z") - datetime.strptime(previous_created, "%Y-%m-%dT%H:%M:%S.%f%z")
-                        changelog.append({
-                            'Created': created_timestamp,
-                            'From': item.fromString,
-                            'To': item.toString,
-                            'time_before_change': format_duration(created_diff)
-                        })
-                    previous_created = created_timestamp
+                    changelog.append({
+                        'Created': created_timestamp,
+                        'From': item.fromString,
+                        'To': item.toString,
+                    })
 
-        # Sort the changelog entries based on the 'Created' timestamp
-        changelog.sort(key=lambda x: datetime.strptime(x['Created'], "%Y-%m-%dT%H:%M:%S.%f%z"))
-
-        issue = Issue(issue_key, issue_data.fields.issuetype.name, parent_key, subtasks, created_date_str, resolution_date_str, changelog)
+        issue = Issue(issue_id, issue_key, issue_data.fields.issuetype.name, parent_key, subtasks, created_date_str, resolution_date_str, changelog)
         issue_list.append(issue)
 
     with open('issues.json', 'w') as file:
